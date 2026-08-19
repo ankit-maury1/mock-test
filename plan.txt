@@ -1,0 +1,11 @@
+AND ALSO WE NEED TO SEE IF ANY STUDENTS ARE TAKING TEST IT WILL SHOW ON SCREEN HOW MANY STUDENTS ARE TAKING THIS TEST WHEN WE 
+
+MAKE OUR SYSTEM FASTER AND SMOOTH AND CAN RUN ON THE ANY DEVICES SMOOTHLY AND EASY TO OPERATE 
+
+in the Performance
+
+Exam-wise Analytics & Rankings please option to filter by rooms on the top so we can filter then in subjects...
+
+IF TH 2 STUDENTS HAVE SAME MARKS IN THE SAME EXAM THEN FIND OUT WHO SUBMITTED FIRST BASED ON THE LESS TIME CONSUMED ITS MARKS SHOULD BECOME HIGHER AS WHO SUBMITTED FIRST (ACCORDING TO THE TIME SHOULD GET RANK) THEN SHOW ON SCREEN OF THAT EXAM
+in the analytics don't show the leader on the top of all exams summary instead show by exams like for exam 1 show all participants based on their marks and if marks are same then sort only whose marks are same based on the first submission I mean less time taken to complete
+and show by rank like 1st,2nd,3rd Hilighted and other till top 10 students
