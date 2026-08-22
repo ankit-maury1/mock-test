@@ -57,7 +57,7 @@ export function QuestionRow({
             aria-label={`Remove question ${index + 1}`}
             onClick={() => {
               if (window.confirm('Are you sure you want to remove this question?')) {
-                // Permanently delete the image from ImgBB (fire-and-forget)
+                // Permanently delete the image   (fire-and-forget)
                 if (question.deleteUrl) deleteQuestionImage(question.deleteUrl)
                 onRemove()
               }

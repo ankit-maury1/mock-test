@@ -8,7 +8,7 @@ export function Logo({ inverse = false }: { inverse?: boolean }) {
       <span className={cx('grid size-9 place-items-center rounded-xl', inverse ? 'bg-primary-foreground text-primary' : 'bg-primary text-primary-foreground')}>
         <BookOpen size={18} />
       </span>
-      <span>Prayas Coaching</span>
+      <span>Mock Test</span>
     </div>
   )
 }

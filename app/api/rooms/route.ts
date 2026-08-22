@@ -9,14 +9,15 @@ export async function POST(request: Request) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
     await connectDB()
-    const admin = await UserModel.findOne({ id: userId }).lean()
-    if (!admin || (admin as Record<string, unknown>).role !== 'admin') {
-      return NextResponse.json({ error: 'Only admins can create rooms.' }, { status: 403 })
+    const user = await UserModel.findOne({ id: userId }).lean()
+    if (!user || ((user as Record<string, unknown>).role !== 'admin' && (user as Record<string, unknown>).role !== 'owner')) {
+      return NextResponse.json({ error: 'Only admins or owners can create rooms.' }, { status: 403 })
     }
 
-    const body = await request.json().catch(() => null) as { name?: unknown; subject?: unknown } | null
+    const body = await request.json().catch(() => null) as { name?: unknown; subject?: unknown; instituteId?: unknown } | null
     const name = String(body?.name ?? '').trim()
     const subject = String(body?.subject ?? '').trim()
+    let instituteId = String(body?.instituteId ?? '').trim()
 
     if (!name) return NextResponse.json({ error: 'Room name is required.' }, { status: 400 })
     if (!subject) return NextResponse.json({ error: 'Subject is required.' }, { status: 400 })
@@ -24,9 +25,12 @@ export async function POST(request: Request) {
 
     const id = crypto.randomUUID()
     const code = Math.random().toString(36).slice(2, 8).toUpperCase()
-    const instituteId = (admin as any).instituteId
 
-    const room = { id, name, subject, code, adminId: userId, memberIds: [] as string[], instituteId }
+    if ((user as Record<string, unknown>).role === 'admin') {
+      instituteId = (user as Record<string, unknown>).instituteId as string || ''
+    }
+
+    const room = { id, name, subject, code, adminId: userId, memberIds: [] as string[], instituteId: instituteId || undefined }
 
     await Promise.all([
       RoomModel.create(room),

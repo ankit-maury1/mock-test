@@ -32,13 +32,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email or password is incorrect.' }, { status: 401 })
     }
 
+    // 1. Check if user account is deactivated
+    if ((dbUser as any).status === 'inactive') {
+      return NextResponse.json(
+        { error: 'Your account has been deactivated. Please contact your administrator.' },
+        { status: 403 },
+      )
+    }
+
+    // 2. Check if user's institute is deactivated (owners are global and exempt)
+    if ((dbUser as any).role !== 'owner' && (dbUser as any).instituteId) {
+      const { InstituteModel } = await import('@/lib/models')
+      const institute = await InstituteModel.findOne({ id: (dbUser as any).instituteId }).lean()
+      if (institute && (institute as any).status === 'inactive') {
+        return NextResponse.json(
+          { error: `This institute (${(institute as any).name}) is currently disabled. Logins for this institute are temporarily suspended.` },
+          { status: 403 },
+        )
+      }
+    }
+
     const user: User = {
       id: dbUser.id as string,
       name: dbUser.name as string,
       email: dbUser.email as string,
       password: '',
-      role: dbUser.role as 'admin' | 'student',
+      role: dbUser.role as 'owner' | 'admin' | 'student',
       roomIds: (dbUser.roomIds as string[]) ?? [],
+      instituteId: (dbUser.instituteId as string) || undefined,
+      status: ((dbUser as any).status as 'active' | 'inactive') ?? 'active',
     }
 
     const res = NextResponse.json({ user })

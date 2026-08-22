@@ -8,6 +8,7 @@ interface Props {
   exam: Exam
   attempt: Attempt
   studentName?: string
+  instituteName?: string
   onClose: () => void
 }
 
@@ -19,7 +20,7 @@ const formatSeconds = (sec?: number) => {
   return `${s}s`
 }
 
-export function AnswerSheetViewer({ exam, attempt, studentName, onClose }: Props) {
+export function AnswerSheetViewer({ exam, attempt, studentName, instituteName, onClose }: Props) {
   const grade = gradeAttempt(exam, attempt)
 
   return (
@@ -27,11 +28,45 @@ export function AnswerSheetViewer({ exam, attempt, studentName, onClose }: Props
       {/* ── Header Summary ────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
         <div>
-          <span className="badge">Submitted Answer Sheet</span>
+          <div className="flex items-center gap-2">
+            <span className="badge">Submitted Answer Sheet</span>
+            {instituteName && (
+              <span className="badge border-primary/30 bg-primary/10 text-primary font-bold text-xs">
+                {instituteName}
+              </span>
+            )}
+          </div>
           <h2 className="mt-2 text-2xl font-bold">{exam.title}</h2>
           {studentName && (
             <p className="text-sm font-medium text-primary">Student: {studentName}</p>
           )}
+
+          {/* Anti-Cheating Summary Badges */}
+          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+            <span
+              className={`badge py-0.5 px-2.5 font-mono font-semibold ${
+                (attempt.tabSwitchCount ?? 0) > 0
+                  ? 'border-destructive/40 bg-destructive/10 text-destructive font-bold'
+                  : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              }`}
+            >
+              👁️ Tab Switches: {attempt.tabSwitchCount ?? 0}
+            </span>
+            <span
+              className={`badge py-0.5 px-2.5 font-mono font-semibold ${
+                (attempt.fullscreenExitCount ?? 0) > 0
+                  ? 'border-destructive/40 bg-destructive/10 text-destructive font-bold'
+                  : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              }`}
+            >
+              🖥️ Fullscreen Exits: {attempt.fullscreenExitCount ?? 0}
+            </span>
+            {(attempt.cheatWarningCount ?? 0) > 0 && (
+              <span className="badge py-0.5 px-2.5 font-mono border-destructive/40 bg-destructive/10 text-destructive font-bold">
+                ⚠️ Blocked Actions: {attempt.cheatWarningCount}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-6">
           <div className="text-right">

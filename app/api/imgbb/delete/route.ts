@@ -4,7 +4,7 @@ import { getSessionUserId } from '@/lib/auth'
 const IMGBB_DELETE_PREFIX = 'https://ibb.co/'
 
 /**
- * Permanently deletes an image from ImgBB by visiting its delete_url.
+ * Permanently deletes an image   by visiting its delete_url.
  * ImgBB uses a secret hash in the URL for authentication — no API key needed for deletion.
  */
 export async function POST(request: Request) {
@@ -38,6 +38,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[POST /api/imgbb/delete]', err)
-    return NextResponse.json({ error: 'Failed to delete image from ImgBB.' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete image  .' }, { status: 500 })
   }
 }

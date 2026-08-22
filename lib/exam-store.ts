@@ -16,27 +16,19 @@ export const seedData: AppData = {
   users: [
     {
       id: 'usr_owner',
-      name: 'Prayas Owner',
-      email: 'owner@prayas.test',
+      name: 'Owner',
+      email: 'owner@gmail.com',
       password: 'owner123',
       role: 'owner',
       roomIds: [],
     },
-    {
-      id: 'usr_admin',
-      name: 'Ankit Maurya',
-      email: 'ankit.maury168@gmail.com',
-      password: 'Ankit123',
-      role: 'admin',
-      roomIds: ['rm_physics_101', 'rm_chem_202'],
-      instituteId: 'inst-1',
-    },
+    { id: 'admin-1', name: 'Dr. Vikram Sharma', email: 'admin@prayas.test', password: 'admin123', role: 'admin', roomIds: ['room-1', 'room-2'], instituteId: 'inst-1' },
     { id: 'student-1', name: 'Alex Morgan', email: 'student@axis.test', password: 'student123', role: 'student', roomIds: ['room-1'], instituteId: 'inst-1' },
     { id: 'student-2', name: 'Nina Park', email: 'nina@axis.test', password: 'student123', role: 'student', roomIds: ['room-1'], instituteId: 'inst-1' },
   ],
   rooms: [
-    { id: 'room-1', name: 'Physics Cohort A', subject: 'Physics', code: 'PHYS24', adminId: 'usr_admin', memberIds: ['student-1', 'student-2'], instituteId: 'inst-1' },
-    { id: 'room-2', name: 'Mathematics Elite', subject: 'Mathematics', code: 'MATH24', adminId: 'usr_admin', memberIds: [], instituteId: 'inst-1' },
+    { id: 'room-1', name: 'Physics Cohort A', subject: 'Physics', code: 'PHYS24', adminId: 'admin-1', memberIds: ['student-1', 'student-2'], instituteId: 'inst-1' },
+    { id: 'room-2', name: 'Mathematics Elite', subject: 'Mathematics', code: 'MATH24', adminId: 'admin-1', memberIds: [], instituteId: 'inst-1' },
   ],
   exams: [
     {

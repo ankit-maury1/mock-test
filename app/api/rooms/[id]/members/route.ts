@@ -26,8 +26,18 @@ export async function PATCH(
 
     await connectDB()
 
-    // Verify admin owns this room
-    const room = await RoomModel.findOne({ id: roomId, adminId }).lean()
+    const user = await UserModel.findOne({ id: adminId }).lean()
+    if (!user || ((user as Record<string, unknown>).role !== 'admin' && (user as Record<string, unknown>).role !== 'owner')) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 })
+    }
+
+    // Verify room access
+    const isOwner = (user as Record<string, unknown>).role === 'owner'
+    const room = await RoomModel.findOne(
+      isOwner
+        ? { id: roomId }
+        : { id: roomId, $or: [{ adminId }, { instituteId: (user as Record<string, unknown>).instituteId }] },
+    ).lean()
     if (!room) return NextResponse.json({ error: 'Room not found.' }, { status: 404 })
 
     // Verify target is a student

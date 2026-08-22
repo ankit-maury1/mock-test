@@ -7,6 +7,8 @@ export interface Institute {
   id: string
   name: string
   description?: string
+  status?: 'active' | 'inactive' | 'pending' | 'rejected'
+  rejectionReason?: string
 }
 
 export interface User {
@@ -17,6 +19,7 @@ export interface User {
   role: Role
   roomIds: string[]
   instituteId?: string
+  status?: 'active' | 'inactive'
 }
 
 export interface Room {
@@ -37,7 +40,7 @@ export interface Question {
   prompt: string
   /** Uploaded question image (ImgBB display_url in production, data URL in the local mock). */
   image?: string
-  /** ImgBB delete_url — stored so the image can be permanently removed from ImgBB when this question is deleted or its image replaced. */
+  /** ImgBB delete_url — stored so the image can be permanently removed   when this question is deleted or its image replaced. */
   deleteUrl?: string
   /** Option labels. Entries may be empty strings when the options live inside the image. */
   options: string[]
@@ -78,6 +81,10 @@ export interface Attempt {
   correct?: number
   incorrect?: number
   instituteId?: string
+  tabSwitchCount?: number
+  fullscreenExitCount?: number
+  cheatWarningCount?: number
+  lastPingAt?: string
 }
 
 export interface AppData {

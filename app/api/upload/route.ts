@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     }
 
     if (!payload.success || !payload.data) {
-      return NextResponse.json({ error: 'Unexpected response from ImgBB.' }, { status: 502 })
+      return NextResponse.json({ error: 'Unexpected response  .' }, { status: 502 })
     }
 
     // Prefer display_url (medium/full size CDN) — fall back to url

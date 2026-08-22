@@ -41,6 +41,8 @@ const InstituteSchema = new Schema(
     id: { type: String, required: true, unique: true },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     description: { type: String, trim: true, maxlength: 200 },
+    status: { type: String, enum: ['active', 'inactive', 'pending', 'rejected'], default: 'pending' },
+    rejectionReason: { type: String, trim: true },
   },
   { timestamps: true },
 )
@@ -64,6 +66,7 @@ const UserSchema = new Schema(
     role: { type: String, enum: ['owner', 'admin', 'student'], default: 'student' },
     roomIds: { type: [String], default: [] },
     instituteId: { type: String },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true },
 )
@@ -116,14 +119,61 @@ const AttemptSchema = new Schema(
     correct: Number,
     incorrect: Number,
     instituteId: { type: String },
+    tabSwitchCount: { type: Number, default: 0 },
+    fullscreenExitCount: { type: Number, default: 0 },
+    cheatWarningCount: { type: Number, default: 0 },
+    lastPingAt: String,
+  },
+  { timestamps: true },
+)
+
+// ─── OTP (password reset) ────────────────────────────────────────────────────
+
+const OtpSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    userId: { type: String, required: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    codeHash: { type: String, required: true },
+    purpose: { type: String, enum: ['password-reset'], default: 'password-reset' },
+    expiresAt: { type: Date, required: true },
+    verified: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+)
+
+// TTL index — MongoDB automatically deletes documents when expiresAt is reached
+OtpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+
+// ─── Email Change Request ────────────────────────────────────────────────────
+
+const EmailChangeRequestSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    userId: { type: String, required: true },
+    currentEmail: { type: String, required: true, lowercase: true, trim: true },
+    newEmail: { type: String, required: true, lowercase: true, trim: true },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    reviewedBy: { type: String },
+    reviewedAt: { type: String },
   },
   { timestamps: true },
 )
 
 // ─── Export models (hot-reload safe: reuse compiled model if already defined) ─
 
+if (models.Institute) {
+  const statusPath = models.Institute.schema.path('status') as any
+  if (statusPath?.enumValues && !statusPath.enumValues.includes('pending')) {
+    delete models.Institute
+  }
+}
+
 export const InstituteModel = models.Institute ?? model('Institute', InstituteSchema)
 export const UserModel = models.User ?? model('User', UserSchema)
 export const RoomModel = models.Room ?? model('Room', RoomSchema)
 export const ExamModel = models.Exam ?? model('Exam', ExamSchema)
 export const AttemptModel = models.Attempt ?? model('Attempt', AttemptSchema)
+export const OtpModel = models.Otp ?? model('Otp', OtpSchema)
+export const EmailChangeRequestModel = models.EmailChangeRequest ?? model('EmailChangeRequest', EmailChangeRequestSchema)
+

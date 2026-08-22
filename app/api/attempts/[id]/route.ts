@@ -14,9 +14,9 @@ export async function DELETE(
     const { id } = await params
     await connectDB()
 
-    const admin = await UserModel.findOne({ id: adminId, role: 'admin' }).lean()
+    const admin = await UserModel.findOne({ id: adminId, role: { $in: ['admin', 'owner'] } }).lean()
     if (!admin) {
-      return NextResponse.json({ error: 'Only admins can reset exam attempts.' }, { status: 403 })
+      return NextResponse.json({ error: 'Only admins or owners can reset exam attempts.' }, { status: 403 })
     }
 
     await AttemptModel.deleteOne({ id })

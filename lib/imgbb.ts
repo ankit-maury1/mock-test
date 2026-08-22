@@ -51,7 +51,7 @@ export async function uploadQuestionImage(file: File): Promise<UploadResult> {
 }
 
 /**
- * Permanently deletes an image from ImgBB via the server-side proxy endpoint.
+ * Permanently deletes an image   via the server-side proxy endpoint.
  * Fire-and-forget — call without await. Failures are silently ignored
  * since a broken delete is non-critical (the image just stays on ImgBB).
  */

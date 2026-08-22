@@ -35,6 +35,9 @@ export function StudentWorkspace({
   const [confirmingExam, setConfirmingExam] = useState<Exam | null>(null)
   const [confirmStep, setConfirmStep] = useState<1 | 2 | 3>(1)
   const [acceptRules, setAcceptRules] = useState(false)
+  const [resultsSubject, setResultsSubject] = useState<string>('all')
+
+  const studentInst = data.institutes?.find((inst) => inst.id === user.instituteId)
 
   const rooms = data.rooms.filter((room) => user.roomIds.includes(room.id))
   const allPublishedExams = data.exams.filter(
@@ -112,7 +115,10 @@ export function StudentWorkspace({
   if (view === 'rooms') {
     return (
       <>
-        <Heading eyebrow="Memberships" title="My classes" />
+        <Heading
+          eyebrow={studentInst ? `${studentInst.name} • Classrooms` : 'Classrooms'}
+          title="My enrolled classes"
+        />
         {!readOnly && (
           <form onSubmit={join} className="mb-6 flex max-w-xl flex-wrap gap-3 rounded-2xl border bg-card p-4">
             <input
@@ -154,6 +160,33 @@ export function StudentWorkspace({
   }
 
   if (view === 'results') {
+    // Only extract subjects from exams the student has actually attempted and submitted
+    const attemptedSubjectSet = new Set<string>()
+    const attemptedResults = attempts
+      .map((attempt) => {
+        const exam = data.exams.find((item) => item.id === attempt.examId)
+        if (exam && exam.subject) attemptedSubjectSet.add(exam.subject)
+        return { attempt, exam }
+      })
+      .filter((item): item is { attempt: Attempt; exam: Exam } => item.exam !== undefined)
+
+    const attemptedSubjects = Array.from(attemptedSubjectSet)
+
+    // Filter results strictly by selected attempted subject
+    const filteredResults =
+      resultsSubject === 'all'
+        ? attemptedResults
+        : attemptedResults.filter((r) => r.exam.subject === resultsSubject)
+
+    // Calculate analytics only across the attempted subjects
+    const totalAttemptedTests = filteredResults.length
+    const totalCorrectAnswers = filteredResults.reduce((acc, r) => acc + (r.attempt.correct ?? 0), 0)
+    const totalQuestionsAnswered = filteredResults.reduce((acc, r) => acc + r.exam.questions.length, 0)
+    const totalMarksEarned = filteredResults.reduce((acc, r) => acc + (r.attempt.score ?? 0), 0)
+    const totalMaxMarks = filteredResults.reduce((acc, r) => acc + totalMarks(r.exam), 0)
+    const avgAccuracy = totalQuestionsAnswered > 0 ? Math.round((totalCorrectAnswers / totalQuestionsAnswered) * 100) : 0
+    const avgScorePercent = totalMaxMarks > 0 ? Math.round((totalMarksEarned / totalMaxMarks) * 100) : 0
+
     return (
       <>
         {inspectingAttempt && (
@@ -163,29 +196,104 @@ export function StudentWorkspace({
                 exam={inspectingAttempt.exam}
                 attempt={inspectingAttempt.attempt}
                 studentName={user.name}
+                instituteName={studentInst?.name}
                 onClose={() => setInspectingAttempt(null)}
               />
             </div>
           </div>
         )}
 
-        <Heading eyebrow="Progress" title="Your results" />
-        {attempts.length ? (
-          <div className="grid gap-4">
-            {attempts.map((attempt) => {
-              const exam = data.exams.find((item) => item.id === attempt.examId)
-              return exam ? (
-                <ResultCard
-                  key={attempt.id}
-                  attempt={attempt}
-                  exam={exam}
-                  onInspect={() => setInspectingAttempt({ exam, attempt })}
-                />
-              ) : null
-            })}
+        <Heading
+          eyebrow={studentInst ? `${studentInst.name} • Performance & Analytics` : 'Progress & Analytics'}
+          title="Your Subject Analytics"
+        />
+
+        {attemptedResults.length > 0 ? (
+          <div className="space-y-6">
+            {/* Subject Filter — Only showing subjects student has attempted */}
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-card p-4">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                  Attempted Subject Filter
+                </p>
+                <p className="text-sm text-foreground">
+                  Showing analytics for {resultsSubject === 'all' ? 'all attempted subjects' : resultsSubject}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setResultsSubject('all')}
+                  className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                    resultsSubject === 'all'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'border bg-background hover:bg-muted text-muted-foreground'
+                  }`}
+                >
+                  All Subjects ({attemptedSubjects.length})
+                </button>
+                {attemptedSubjects.map((sub) => (
+                  <button
+                    key={sub}
+                    type="button"
+                    onClick={() => setResultsSubject(sub)}
+                    className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                      resultsSubject === sub
+                        ? 'bg-primary text-primary-foreground shadow-xs'
+                        : 'border bg-background hover:bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Subject Performance Stats Cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl border bg-card p-5">
+                <span className="text-xs font-medium text-muted-foreground">Tests Submitted</span>
+                <p className="mt-2 text-2xl font-bold text-foreground">{totalAttemptedTests}</p>
+                <span className="text-xs text-muted-foreground">in selected subject</span>
+              </div>
+              <div className="rounded-2xl border bg-card p-5">
+                <span className="text-xs font-medium text-muted-foreground">Average Accuracy</span>
+                <p className="mt-2 text-2xl font-bold text-foreground">{avgAccuracy}%</p>
+                <span className="text-xs text-muted-foreground">{totalCorrectAnswers} correct of {totalQuestionsAnswered}</span>
+              </div>
+              <div className="rounded-2xl border bg-card p-5">
+                <span className="text-xs font-medium text-muted-foreground">Total Marks Earned</span>
+                <p className="mt-2 text-2xl font-bold text-foreground">
+                  {totalMarksEarned} <span className="text-xs text-muted-foreground">/ {totalMaxMarks}</span>
+                </p>
+                <span className="text-xs text-muted-foreground">{avgScorePercent}% score aggregate</span>
+              </div>
+              <div className="rounded-2xl border bg-card p-5">
+                <span className="text-xs font-medium text-muted-foreground">Subjects Attempted</span>
+                <p className="mt-2 text-2xl font-bold text-foreground">{attemptedSubjects.length}</p>
+                <span className="text-xs text-muted-foreground">Unlocked analytics</span>
+              </div>
+            </div>
+
+            {/* List of Attempted Test Results */}
+            <div className="space-y-4">
+              <h3 className="text-base font-semibold text-foreground">
+                Submitted Assessments ({filteredResults.length})
+              </h3>
+              <div className="grid gap-4">
+                {filteredResults.map(({ attempt, exam }) => (
+                  <ResultCard
+                    key={attempt.id}
+                    attempt={attempt}
+                    exam={exam}
+                    onInspect={() => setInspectingAttempt({ exam, attempt })}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
-          <Empty text="Complete your first test to see results." />
+          <Empty text="No test analytics yet. Subject analytics and solutions will automatically unlock after you complete and submit your first test." />
         )}
       </>
     )
@@ -389,11 +497,19 @@ export function StudentWorkspace({
       )}
 
       <Heading
-        eyebrow={view === 'exams' ? 'Assessments' : 'Student home'}
+        eyebrow={
+          view === 'exams'
+            ? studentInst
+              ? `${studentInst.name} • Assessments`
+              : 'Assessments'
+            : studentInst
+              ? `${studentInst.name} • Student Portal`
+              : 'Student Home'
+        }
         title={
           view === 'exams'
             ? 'Available tests'
-            : `Ready when you are, ${user.name.split(' ')[0]}.`
+            : `Welcome back, ${user.name}.`
         }
       />
 
@@ -456,18 +572,29 @@ export function StudentWorkspace({
 
             return (
               <article key={exam.id} className="rounded-2xl border bg-card p-6 shadow-xs">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="badge">
-                    {attempt
-                      ? 'Completed'
-                      : isUpcoming
-                        ? 'Scheduled / Upcoming'
-                        : isExpired
-                          ? 'Expired'
-                          : resume
-                            ? 'In progress'
-                            : 'Live now'}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="badge">
+                      {attempt
+                        ? 'Completed'
+                        : isUpcoming
+                          ? 'Scheduled / Upcoming'
+                          : isExpired
+                            ? 'Expired'
+                            : resume
+                              ? 'In progress'
+                              : 'Live now'}
+                    </span>
+                    {data.attempts.filter((a) => a.examId === exam.id && !a.submittedAt).length > 0 && !attempt && (
+                      <span className="badge flex items-center gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold text-[11px]">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        {data.attempts.filter((a) => a.examId === exam.id && !a.submittedAt).length} taking test now
+                      </span>
+                    )}
+                  </div>
                   <Clock3 className="text-muted-foreground" />
                 </div>
 

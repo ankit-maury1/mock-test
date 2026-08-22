@@ -51,14 +51,14 @@ export function QuestionEditor({ initial, onSave, onCancel, onApplyToAll, saveLa
     try {
       const result = await uploadQuestionImage(file)
 
-      // Delete the old image from ImgBB before replacing (fire-and-forget)
+      // Delete the old image   before replacing (fire-and-forget)
       if (draft.deleteUrl) deleteQuestionImage(draft.deleteUrl)
 
       patch({ image: result.url, deleteUrl: result.deleteUrl })
       setNotice(
         result.hosted
-          ? '✓ Uploaded to ImgBB — image is permanently hosted.'
-          : 'Saved locally. Add IMGBB_API_KEY to host images on ImgBB permanently.',
+          ? '✓ image is permanently hosted.'
+          : 'Saved locally. Add API_KEY to host images on ImgBB permanently.',
       )
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Upload failed.')
@@ -68,7 +68,7 @@ export function QuestionEditor({ initial, onSave, onCancel, onApplyToAll, saveLa
     }
   }
 
-  /** Removes the image and deletes it from ImgBB (fire-and-forget). */
+  /** Removes the image and deletes it   (fire-and-forget). */
   const removeImage = () => {
     if (draft.deleteUrl) deleteQuestionImage(draft.deleteUrl)
     patch({ image: undefined, deleteUrl: undefined })
@@ -148,7 +148,7 @@ export function QuestionEditor({ initial, onSave, onCancel, onApplyToAll, saveLa
             {uploadStatus === 'uploading' ? (
               <>
                 <Loader2 className="animate-spin text-primary" />
-                <span className="font-medium text-foreground">Uploading to ImgBB…</span>
+                <span className="font-medium text-foreground">Uploading...</span>
                 <span className="text-xs">You can fill in other fields while this uploads</span>
               </>
             ) : (

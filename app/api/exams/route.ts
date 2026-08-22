@@ -10,9 +10,9 @@ export async function POST(request: Request) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
     await connectDB()
-    const admin = await UserModel.findOne({ id: userId }).lean()
-    if (!admin || (admin as Record<string, unknown>).role !== 'admin') {
-      return NextResponse.json({ error: 'Only admins can create exams.' }, { status: 403 })
+    const user = await UserModel.findOne({ id: userId }).lean()
+    if (!user || ((user as Record<string, unknown>).role !== 'admin' && (user as Record<string, unknown>).role !== 'owner')) {
+      return NextResponse.json({ error: 'Only admins or owners can create exams.' }, { status: 403 })
     }
 
     const body = await request.json().catch(() => null) as Exam | null
@@ -26,16 +26,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Duration must be at least 1 minute.' }, { status: 400 })
     }
 
-    // Verify admin owns all specified rooms
-    const ownedCount = await RoomModel.countDocuments({
-      id: { $in: body.roomIds },
-      adminId: userId,
-    })
-    if (ownedCount !== body.roomIds.length) {
+    // Verify rooms exist
+    const isOwner = (user as Record<string, unknown>).role === 'owner'
+    const roomQuery = isOwner
+      ? { id: { $in: body.roomIds } }
+      : { id: { $in: body.roomIds }, $or: [{ adminId: userId }, { instituteId: (user as Record<string, unknown>).instituteId as string }] }
+
+    const validRoomsCount = await RoomModel.countDocuments(roomQuery)
+    if (validRoomsCount !== body.roomIds.length) {
       return NextResponse.json({ error: 'Invalid room selection.' }, { status: 403 })
     }
 
-    const instituteId = (admin as any).instituteId
+    const instituteId = isOwner
+      ? (body.instituteId || undefined)
+      : ((user as Record<string, unknown>).instituteId as string || undefined)
+
     const examToCreate = { ...body, instituteId }
 
     await ExamModel.create(examToCreate)

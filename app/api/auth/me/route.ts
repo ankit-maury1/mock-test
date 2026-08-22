@@ -21,8 +21,10 @@ export async function GET() {
       name: dbUser.name as string,
       email: dbUser.email as string,
       password: '',
-      role: dbUser.role as 'admin' | 'student',
+      role: dbUser.role as 'owner' | 'admin' | 'student',
       roomIds: (dbUser.roomIds as string[]) ?? [],
+      instituteId: (dbUser.instituteId as string) || undefined,
+      status: ((dbUser as any).status as 'active' | 'inactive') ?? 'active',
     }
     return NextResponse.json({ user })
   } catch (err) {

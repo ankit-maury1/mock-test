@@ -7,7 +7,7 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'Prayas Coaching — Assessment Workspace',
+  title: 'Mock Test — Assessment Workspace',
   description: 'Create classrooms, run focused exams, and understand every result.',
   generator: 'Ankit Maury',
 }

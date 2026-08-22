@@ -34,32 +34,46 @@ export async function PATCH(
       name?: unknown
       email?: unknown
       password?: unknown
+      status?: unknown
     } | null
 
-    const name = String(body?.name ?? '').trim()
-    const email = String(body?.email ?? '').trim().toLowerCase()
+    const name = body?.name !== undefined ? String(body.name).trim() : undefined
+    const email = body?.email !== undefined ? String(body.email).trim().toLowerCase() : undefined
     const password = body?.password ? String(body.password) : undefined
+    const status = body?.status !== undefined ? String(body.status) : undefined
 
-    if (!name || !email) {
-      return NextResponse.json({ error: 'Name and email are required.' }, { status: 400 })
-    }
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 })
+    const update: Record<string, unknown> = {}
+
+    if (name !== undefined) {
+      if (!name) return NextResponse.json({ error: 'Name cannot be empty.' }, { status: 400 })
+      update.name = name
     }
 
-    if (email !== targetUser.email) {
-      const existing = await UserModel.findOne({ email, id: { $ne: id } })
-      if (existing) {
-        return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 409 })
+    if (email !== undefined) {
+      if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+        return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 })
       }
+      if (email !== targetUser.email) {
+        const existing = await UserModel.findOne({ email, id: { $ne: id } })
+        if (existing) {
+          return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 409 })
+        }
+      }
+      update.email = email
     }
 
-    const update: Record<string, unknown> = { name, email }
     if (password) {
       if (password.length < 4) {
         return NextResponse.json({ error: 'Password must be at least 4 characters.' }, { status: 400 })
       }
       update.passwordHash = await bcrypt.hash(password, 10)
+    }
+
+    if (status !== undefined) {
+      if (status !== 'active' && status !== 'inactive') {
+        return NextResponse.json({ error: 'Status must be active or inactive.' }, { status: 400 })
+      }
+      update.status = status
     }
 
     await UserModel.updateOne({ id }, { $set: update })

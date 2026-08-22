@@ -63,6 +63,45 @@ export async function POST(request: Request) {
     const passwordHash = await bcrypt.hash(password, 10)
     await UserModel.create({ id, name, email, passwordHash, role, roomIds: [], instituteId })
 
+    // ─── Send welcome email ─────────────────────────────────────────────
+    // Fire-and-forget — don't block the API response on email delivery
+    let instituteName = ''
+    if (instituteId) {
+      const { InstituteModel } = await import('@/lib/models')
+      const institute = await InstituteModel.findOne({ id: instituteId }).lean()
+      if (institute) instituteName = (institute as any).name || ''
+    }
+
+    if (instituteName) {
+      const { sendMail } = await import('@/lib/mailer')
+      if (role === 'admin') {
+        const { welcomeAdminEmail } = await import('@/lib/email-templates')
+        sendMail({
+          to: email,
+          subject: `Administrator Access Credentials - ${instituteName}`,
+          html: welcomeAdminEmail({
+            instituteName,
+            adminName: name,
+            email,
+            password,
+          }),
+        })
+      } else {
+        const { welcomeStudentEmail } = await import('@/lib/email-templates')
+        sendMail({
+          to: email,
+          subject: `Account Access Credentials - ${instituteName}`,
+          html: welcomeStudentEmail({
+            instituteName,
+            studentName: name,
+            email,
+            password,
+          }),
+        })
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     const user: User = { id, name, email, password: '', role: role as any, roomIds: [], instituteId }
     return NextResponse.json({ user }, { status: 201 })
   } catch (err) {

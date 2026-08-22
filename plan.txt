@@ -9,3 +9,14 @@ Exam-wise Analytics & Rankings please option to filter by rooms on the top so we
 IF TH 2 STUDENTS HAVE SAME MARKS IN THE SAME EXAM THEN FIND OUT WHO SUBMITTED FIRST BASED ON THE LESS TIME CONSUMED ITS MARKS SHOULD BECOME HIGHER AS WHO SUBMITTED FIRST (ACCORDING TO THE TIME SHOULD GET RANK) THEN SHOW ON SCREEN OF THAT EXAM
 in the analytics don't show the leader on the top of all exams summary instead show by exams like for exam 1 show all participants based on their marks and if marks are same then sort only whose marks are same based on the first submission I mean less time taken to complete
 and show by rank like 1st,2nd,3rd Hilighted and other till top 10 students
+
+when viewing any Institute owner's Institute will become that Institute id in which owner is viewing and if impersonating then it will inherit all the details of thet person along with show original owner name and when end impersonating revert login back to that user
+
+Make different pages to view admins and students so system will take less load on it on everyone pages
+
+
+
+I catched a flaw that I was just watching as owner by clicking Enter Institute Workspace → then I saw that I can do anything here I can create manage everything make sure it is readonly for owner when viewing worksapce as Enter Institute Workspace → and I created a room in a Institute then I loggedin as Admin and I am unable to see that room in that Institute but Owner is able to see
+
+
+I see that I am only on the main page on localhost:3000 when chenging pages it is not changing the page urls please make it url based so if I click back or something then go back to 1 step url currently not showing any urls of pages

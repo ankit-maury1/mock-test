@@ -22,35 +22,37 @@ export async function seedIfEmpty(): Promise<void> {
     id: 'inst-1',
     name: 'Prayas Coaching Institute',
     description: 'Main campus coaching institute',
+    status: 'active',
   })
 
   // Seed owner account
   const ownerHash = await bcrypt.hash('owner123', SALT_ROUNDS)
   const ownerUser = {
     id: 'usr_owner',
-    name: 'Prayas Owner',
-    email: 'owner@prayas.test',
+    name: 'Owner',
+    email: 'owner@gmail.com',
     passwordHash: ownerHash,
     role: 'owner' as const,
     roomIds: [] as string[],
     instituteId: undefined as string | undefined,
+    status: 'active' as const,
   }
 
   const users = await Promise.all(
-    seedData.users.map(async (user) => {
-      const isAdmin = user.role === 'admin'
-      const email = isAdmin ? 'ankit.maury168@gmail.com' : user.email
-      const password = isAdmin ? 'Ankit123' : user.password
-      return {
-        id: user.id,
-        name: isAdmin ? 'Ankit Maurya' : user.name,
-        email,
-        passwordHash: await bcrypt.hash(password, SALT_ROUNDS),
-        role: user.role,
-        roomIds: user.roomIds,
-        instituteId: 'inst-1' as string | undefined,
-      }
-    }),
+    seedData.users
+      .filter((user) => user.role !== 'owner')
+      .map(async (user) => {
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          passwordHash: await bcrypt.hash(user.password, SALT_ROUNDS),
+          role: user.role,
+          roomIds: user.roomIds,
+          instituteId: 'inst-1' as string | undefined,
+          status: 'active' as const,
+        }
+      }),
   )
 
   users.push(ownerUser)
@@ -70,5 +72,5 @@ export async function seedIfEmpty(): Promise<void> {
     AttemptModel.insertMany(attempts),
   ])
 
-  console.log('[Axis] Demo data seeded. Login: owner@prayas.test / owner123')
+  console.log('[Axis] Demo data seeded. Login: owner@gmail.com / owner123')
 }

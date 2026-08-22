@@ -4,9 +4,14 @@ import { connectDB } from '@/lib/mongodb'
 import { UserModel, RoomModel, ExamModel, AttemptModel } from '@/lib/models'
 import type { Exam } from '@/lib/exam-types'
 
-/** Verifies the exam belongs to a room owned by the authenticated admin. */
-async function getAdminExam(examId: string, adminId: string) {
-  const adminRooms = await RoomModel.find({ adminId }).lean()
+/** Verifies the exam belongs to a room owned by the authenticated admin, or any exam if owner. */
+async function getAccessibleExam(examId: string, user: Record<string, unknown>) {
+  if (user.role === 'owner') {
+    return ExamModel.findOne({ id: examId }).lean()
+  }
+  const adminRooms = await RoomModel.find({
+    $or: [{ adminId: user.id }, { instituteId: user.instituteId as string }],
+  }).lean()
   const adminRoomIds = (adminRooms as Record<string, unknown>[]).map((r) => r.id as string)
   return ExamModel.findOne({ id: examId, roomIds: { $in: adminRoomIds } }).lean()
 }
@@ -22,15 +27,27 @@ export async function PATCH(
     const { id } = await params
     await connectDB()
 
-    const admin = await UserModel.findOne({ id: userId, role: 'admin' }).lean()
-    if (!admin) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    const user = await UserModel.findOne({ id: userId, role: { $in: ['admin', 'owner'] } }).lean()
+    if (!user) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
 
-    const exam = await getAdminExam(id, userId)
+    const exam = await getAccessibleExam(id, user as Record<string, unknown>)
     if (!exam) return NextResponse.json({ error: 'Exam not found.' }, { status: 404 })
 
     const changes = await request.json().catch(() => null) as Partial<Exam> | null
     if (!changes || Object.keys(changes).length === 0) {
       return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
+    }
+
+    // Check if active attempts are currently in progress
+    const activeAttemptExists = await AttemptModel.exists({
+      examId: id,
+      $or: [{ submittedAt: { $exists: false } }, { submittedAt: null }],
+    })
+    if (activeAttemptExists) {
+      return NextResponse.json(
+        { error: 'This exam is currently being attempted by students and cannot be modified or deleted.' },
+        { status: 400 },
+      )
     }
 
     // Sanitize: strip fields that must not change via PATCH
@@ -55,11 +72,23 @@ export async function DELETE(
     const { id } = await params
     await connectDB()
 
-    const admin = await UserModel.findOne({ id: userId, role: 'admin' }).lean()
-    if (!admin) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    const user = await UserModel.findOne({ id: userId, role: { $in: ['admin', 'owner'] } }).lean()
+    if (!user) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
 
-    const exam = await getAdminExam(id, userId)
+    const exam = await getAccessibleExam(id, user as Record<string, unknown>)
     if (!exam) return NextResponse.json({ error: 'Exam not found.' }, { status: 404 })
+
+    // Check if active attempts are currently in progress
+    const activeAttemptInDelete = await AttemptModel.exists({
+      examId: id,
+      $or: [{ submittedAt: { $exists: false } }, { submittedAt: null }],
+    })
+    if (activeAttemptInDelete) {
+      return NextResponse.json(
+        { error: 'This exam is currently being attempted by students and cannot be deleted.' },
+        { status: 400 },
+      )
+    }
 
     // Collect ImgBB delete URLs so the client can clean them up
     const deleteUrls = ((exam as Record<string, unknown>).questions as Record<string, unknown>[])

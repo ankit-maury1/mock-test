@@ -19,6 +19,7 @@ function toUser(doc: Record<string, unknown>): User {
     role: doc.role as 'owner' | 'admin' | 'student',
     roomIds: (doc.roomIds as string[]) ?? [],
     instituteId: doc.instituteId as string | undefined,
+    status: (doc.status as 'active' | 'inactive') ?? 'active',
   }
 }
 
@@ -108,6 +109,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'User not found.' }, { status: 404 })
     }
 
+    // Block deactivated accounts
+    if ((dbUser as any).status === 'inactive') {
+      return NextResponse.json({ error: 'Your account has been deactivated. Please contact your administrator.' }, { status: 403 })
+    }
+
+    // Block non-owner users if their institute is deactivated or rejected
+    if ((dbUser as any).role !== 'owner' && (dbUser as any).instituteId) {
+      const userInst = await InstituteModel.findOne({ id: (dbUser as any).instituteId }).lean()
+      if (userInst) {
+        if ((userInst as any).status === 'inactive') {
+          return NextResponse.json({ error: `This institute (${(userInst as any).name}) has been deactivated.` }, { status: 403 })
+        }
+        if ((userInst as any).status === 'rejected') {
+          return NextResponse.json({ error: `The registration request for institute "${(userInst as any).name}" was not approved.` }, { status: 403 })
+        }
+      }
+    }
+
     const { searchParams } = new URL(request.url)
     const instituteId = searchParams.get('instituteId')
 
@@ -119,7 +138,7 @@ export async function GET(request: Request) {
 
     if ((dbUser as Record<string, unknown>).role === 'owner') {
       institutes = (await InstituteModel.find({}).sort({ name: 1 }).lean()) as Record<string, unknown>[]
-      
+
       if (instituteId) {
         rooms = (await RoomModel.find({ instituteId }).lean()) as Record<string, unknown>[]
         exams = (await ExamModel.find({ instituteId }).lean()) as Record<string, unknown>[]
@@ -127,31 +146,39 @@ export async function GET(request: Request) {
 
         attempts = (await AttemptModel.find({
           examId: { $in: examIds },
-          submittedAt: { $exists: true, $ne: null },
         }).lean()) as Record<string, unknown>[]
 
         users = (await UserModel.find({ instituteId }).lean()) as Record<string, unknown>[]
       } else {
+        // Owner is on the Institutes console page — do NOT fetch rooms, exams, attempts, or other users.
+        rooms = []
+        exams = []
         users = [dbUser as Record<string, unknown>]
+        attempts = []
       }
     } else if ((dbUser as Record<string, unknown>).role === 'admin') {
       const instId = (dbUser as Record<string, unknown>).instituteId as string
+      if (instId) {
+        institutes = (await InstituteModel.find({ id: instId }).lean()) as Record<string, unknown>[]
+      }
       rooms = (await RoomModel.find({ instituteId: instId }).lean()) as Record<string, unknown>[]
-      
+
       exams = (await ExamModel.find({ instituteId: instId }).lean()) as Record<string, unknown>[]
       const examIds = exams.map((e) => e.id as string)
 
       attempts = (await AttemptModel.find({
         examId: { $in: examIds },
-        submittedAt: { $exists: true, $ne: null },
       }).lean()) as Record<string, unknown>[]
 
       users = (await UserModel.find({ instituteId: instId }).lean()) as Record<string, unknown>[]
     } else {
       // Student
       const instId = (dbUser as Record<string, unknown>).instituteId as string
+      if (instId) {
+        institutes = (await InstituteModel.find({ id: instId }).lean()) as Record<string, unknown>[]
+      }
       const userRoomIds = (dbUser as Record<string, unknown>).roomIds as string[]
-      
+
       rooms = (await RoomModel.find({ id: { $in: userRoomIds }, instituteId: instId }).lean()) as Record<
         string,
         unknown
@@ -161,7 +188,7 @@ export async function GET(request: Request) {
         published: true,
         instituteId: instId,
       }).lean()) as Record<string, unknown>[]
-      attempts = (await AttemptModel.find({ userId, instituteId: instId }).lean()) as Record<string, unknown>[]
+      attempts = (await AttemptModel.find({ userId }).lean()) as Record<string, unknown>[]
       users = [dbUser as Record<string, unknown>]
     }
 
@@ -174,6 +201,7 @@ export async function GET(request: Request) {
         id: i.id as string,
         name: i.name as string,
         description: i.description as string | undefined,
+        status: (i.status as 'active' | 'inactive') ?? 'active',
       })),
     }
 

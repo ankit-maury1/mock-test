@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Flag } from 'lucide-react'
+import { ChevronLeft, ChevronRight, EyeOff, Flag, Maximize2, ShieldAlert } from 'lucide-react'
 import { gradeAttempt, formatDateTime, optionsOf, type Answer, type AppData, type Attempt, type Exam, type User } from '@/lib/exam-types'
 import { cx } from './ui-bits'
 
@@ -62,14 +62,17 @@ export function TestRunner({
   const forceSubmit = useCallback(async () => {
     if (submitted.current) return
     submitted.current = true
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     const graded = gradeAttempt(exam, attempt)
     const done: Attempt = { ...attempt, ...graded, submittedAt: new Date().toISOString() }
     try {
       await onSave(done)
-    } catch {
-      console.error('[TestRunner] Submission save failed')
+      close()
+    } catch (err) {
+      console.error('[TestRunner] Submission save failed:', err)
+      submitted.current = false
+      alert('Failed to submit test. Please check your network connection and try submitting again.')
     }
-    close()
   }, [attempt, close, exam, onSave])
 
   const submit = useCallback(() => {
@@ -83,7 +86,7 @@ export function TestRunner({
     const tick = () =>
       setLeft(
         exam.duration * 60 -
-          Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000),
+        Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000),
       )
     const timer = setInterval(tick, 1000)
     return () => clearInterval(timer)
@@ -114,7 +117,7 @@ export function TestRunner({
     if (submitted.current) return
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(() => {
-      onSave(attempt).catch(() => {})
+      onSave(attempt).catch(() => { })
     }, 5000)
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
@@ -144,6 +147,155 @@ export function TestRunner({
       ),
     }))
   }
+
+  // Anti-cheating telemetry states
+  const [tabSwitchCount, setTabSwitchCount] = useState<number>(() => existing?.tabSwitchCount ?? 0)
+  const [fullscreenExitCount, setFullscreenExitCount] = useState<number>(() => existing?.fullscreenExitCount ?? 0)
+  const [cheatWarningCount, setCheatWarningCount] = useState<number>(() => existing?.cheatWarningCount ?? 0)
+  const [warningToast, setWarningToast] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
+
+  const triggerWarning = useCallback((msg: string) => {
+    setWarningToast(msg)
+    setTimeout(() => {
+      setWarningToast((current) => (current === msg ? null : current))
+    }, 5000)
+  }, [])
+
+  // Immediately persist initial attempt on mount so server & admins know the exam is in progress instantly
+  useEffect(() => {
+    const initAttempt: Attempt = {
+      ...attempt,
+      tabSwitchCount: existing?.tabSwitchCount ?? 0,
+      fullscreenExitCount: existing?.fullscreenExitCount ?? 0,
+      cheatWarningCount: existing?.cheatWarningCount ?? 0,
+      lastPingAt: new Date().toISOString(),
+      instituteId: exam.instituteId || user.instituteId,
+    }
+    onSave(initAttempt).catch(() => { })
+  }, [])
+
+  // Sync anti-cheating telemetry to attempt object
+  useEffect(() => {
+    setAttempt((prev) => ({
+      ...prev,
+      tabSwitchCount,
+      fullscreenExitCount,
+      cheatWarningCount,
+      lastPingAt: new Date().toISOString(),
+      instituteId: exam.instituteId || user.instituteId,
+    }))
+  }, [tabSwitchCount, fullscreenExitCount, cheatWarningCount, exam.instituteId, user.instituteId])
+
+  // Periodic live telemetry ping every 4 seconds while test is active
+  useEffect(() => {
+    if (submitted.current) return
+    const pingTimer = setInterval(() => {
+      const liveAttempt: Attempt = {
+        ...attempt,
+        tabSwitchCount,
+        fullscreenExitCount,
+        cheatWarningCount,
+        lastPingAt: new Date().toISOString(),
+        instituteId: exam.instituteId || user.instituteId,
+      }
+      onSave(liveAttempt).catch(() => { })
+    }, 4000)
+    return () => clearInterval(pingTimer)
+  }, [attempt, cheatWarningCount, exam.instituteId, fullscreenExitCount, onSave, tabSwitchCount, user.instituteId])
+
+  // 1. Tab switch & visibility change listener
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setTabSwitchCount((c) => {
+          const next = c + 1
+          triggerWarning(`⚠️ Anti-Cheating Alert: Window focus loss / tab switch detected (Incident #${next})!`)
+          return next
+        })
+      }
+    }
+    const handleBlur = () => {
+      setTabSwitchCount((c) => {
+        const next = c + 1
+        triggerWarning(`⚠️ Anti-Cheating Alert: Browser window lost focus (Incident #${next})!`)
+        return next
+      })
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('blur', handleBlur)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('blur', handleBlur)
+    }
+  }, [triggerWarning])
+
+  // 2. Fullscreen change listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const active = !!document.fullscreenElement
+      setIsFullscreen(active)
+      if (!active && !submitted.current) {
+        setFullscreenExitCount((c) => {
+          const next = c + 1
+          triggerWarning(`⚠️ Anti-Cheating Alert: Fullscreen mode exited! Please return to fullscreen.`)
+          return next
+        })
+      }
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [triggerWarning])
+
+  const enterFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => { })
+    }
+  }
+
+  // 3. Security lock: Copy/Paste, Right-click context menu, DevTools shortcuts
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+      setCheatWarningCount((c) => c + 1)
+      triggerWarning('⚠️ Right-click context menu is disabled during the exam.')
+    }
+    const handleCopyPaste = (e: ClipboardEvent) => {
+      e.preventDefault()
+      setCheatWarningCount((c) => c + 1)
+      triggerWarning('⚠️ Copy / Cut / Paste actions are blocked for exam security.')
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isDevTools =
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && ['I', 'i', 'C', 'c', 'J', 'j'].includes(e.key)) ||
+        (e.ctrlKey && ['U', 'u'].includes(e.key))
+
+      if (isDevTools) {
+        e.preventDefault()
+        setCheatWarningCount((c) => c + 1)
+        triggerWarning('⚠️ Developer tools and page inspection are blocked.')
+      }
+    }
+
+    document.addEventListener('contextmenu', handleContextMenu)
+    document.addEventListener('copy', handleCopyPaste)
+    document.addEventListener('cut', handleCopyPaste)
+    document.addEventListener('paste', handleCopyPaste)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu)
+      document.removeEventListener('copy', handleCopyPaste)
+      document.removeEventListener('cut', handleCopyPaste)
+      document.removeEventListener('paste', handleCopyPaste)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [triggerWarning])
 
   // Auto-submit on window unload / exit tab
   useEffect(() => {
@@ -177,8 +329,35 @@ export function TestRunner({
   const reviewCount = attempt.answers.filter((item) => item.status === 'review').length
   const skippedCount = exam.questions.length - answeredCount
 
+  const institute = data.institutes?.find((i) => i.id === exam.instituteId || i.id === user.instituteId)
+
   return (
-    <main className="min-h-screen bg-muted/40">
+    <main className="min-h-screen bg-muted/40 select-none">
+      {/* Floating Anti-Cheating Warning Toast */}
+      {warningToast && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl bg-destructive text-destructive-foreground px-5 py-3 text-xs font-bold shadow-2xl animate-bounce">
+          <ShieldAlert size={18} />
+          <span>{warningToast}</span>
+        </div>
+      )}
+
+      {/* Fullscreen Prompt Banner */}
+      {!isFullscreen && (
+        <div className="bg-amber-600 text-white font-semibold px-4 py-2 text-xs flex items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center gap-2">
+            <EyeOff size={14} />
+            <span>Anti-Cheating Protection: Test runner should be viewed in Fullscreen Mode.</span>
+          </div>
+          <button
+            type="button"
+            onClick={enterFullscreen}
+            className="btn text-[11px] py-1 px-3 bg-white text-amber-950 font-bold hover:bg-amber-50"
+          >
+            <Maximize2 size={12} className="mr-1 inline" /> Enter Fullscreen
+          </button>
+        </div>
+      )}
+
       {/* Expiry Warning Banner (<10 minutes remaining until hard exam expiration) */}
       {expirySecLeft !== null && expirySecLeft <= 600 && expirySecLeft > 0 && (
         <div className="bg-amber-500 text-amber-950 font-bold px-4 py-2.5 text-xs text-center border-b flex flex-wrap items-center justify-center gap-2 animate-pulse shadow-md">
@@ -187,9 +366,19 @@ export function TestRunner({
         </div>
       )}
 
-      <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-4 md:px-8">
+      <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-4 md:px-8 shadow-xs">
         <div>
-          <p className="font-semibold text-foreground">{exam.title}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-foreground">{exam.title}</p>
+            {institute && (
+              <span className="badge text-[10px] font-bold border-primary/30 bg-primary/10 text-primary">
+                {institute.name}
+              </span>
+            )}
+            <span className="badge text-[10px] font-bold border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              🟢 ANTI-CHEAT LIVE
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground">
             Question {index + 1} of {exam.questions.length} · {answeredCount} answered
             {!exam.neverUnpublish && exam.endsAt && (
@@ -197,7 +386,34 @@ export function TestRunner({
             )}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Anti-cheating header indicators */}
+          <div className="hidden sm:flex items-center gap-2 text-[11px] font-medium">
+            <span
+              className={cx(
+                'badge py-0.5 px-2 font-mono',
+                tabSwitchCount > 0 ? 'bg-destructive/10 text-destructive border-destructive/30 font-bold' : 'bg-muted text-muted-foreground',
+              )}
+              title="Tab switches & window focus loss count"
+            >
+              👁️ Tabs: {tabSwitchCount}
+            </span>
+            <span
+              className={cx(
+                'badge py-0.5 px-2 font-mono',
+                fullscreenExitCount > 0 ? 'bg-destructive/10 text-destructive border-destructive/30 font-bold' : 'bg-muted text-muted-foreground',
+              )}
+              title="Fullscreen exit count"
+            >
+              🖥️ Exits: {fullscreenExitCount}
+            </span>
+            {cheatWarningCount > 0 && (
+              <span className="badge py-0.5 px-2 font-mono bg-destructive/10 text-destructive border-destructive/30 font-bold">
+                ⚠️ Blocked: {cheatWarningCount}
+              </span>
+            )}
+          </div>
+
           <span className={cx('font-mono text-lg font-semibold', (left <= 60 || (expirySecLeft !== null && expirySecLeft <= 600)) && 'text-destructive')}>
             {clock(left)}
           </span>
@@ -364,3 +580,4 @@ export function TestRunner({
     </main>
   )
 }
+
