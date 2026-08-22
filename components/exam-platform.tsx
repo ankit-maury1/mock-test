@@ -1303,7 +1303,7 @@ function Auth({
               </>
             )}
 
-            <div className="mt-6 rounded-2xl bg-muted p-4 text-xs">
+            {/* <div className="mt-6 rounded-2xl bg-muted p-4 text-xs">
               <p className="font-semibold text-foreground">Demo access</p>
               <p className="mt-1.5 text-muted-foreground">Owner: owner@gmail.com / owner123</p>
               <p className="text-muted-foreground">Admin: admin@prayas.test / admin123</p>
@@ -1313,7 +1313,7 @@ function Auth({
                   ⚠ Running in offline mode — add MONGODB_URI to .env for persistence.
                 </p>
               )}
-            </div>
+            </div> */}
           </div>
         </section>
       </div>
