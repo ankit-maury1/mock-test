@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Clock,
   Eye,
+  EyeOff,
   Filter,
   KeyRound,
   LayoutDashboard,
@@ -22,7 +23,9 @@ import {
   Settings as SettingsIcon,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Trophy,
+  UserPlus,
   Users,
   X,
   XCircle,
@@ -562,8 +565,17 @@ export function ExamPlatform() {
     return error ?? null
   }
 
-  const addUser = async (name: string, email: string, password: string, role: 'admin' | 'student'): Promise<string | null> => {
-    const targetInstId = activeInstituteId || user!.instituteId
+  const addUser = async (
+    name: string,
+    email: string,
+    password: string,
+    role: 'admin' | 'student',
+    customInstituteId?: string,
+  ): Promise<string | null> => {
+    const targetInstId = customInstituteId || activeInstituteId || user!.instituteId
+    if (user?.role === 'owner' && !targetInstId) {
+      return 'Please select an institute for this user.'
+    }
     if (!isApi) {
       const stored = loadData()
       if (stored.users.some((u) => u.email === email))
@@ -944,6 +956,7 @@ export function ExamPlatform() {
               navigateTo(targetView || 'dashboard', id, null, targetRoleFilter || null)
             }}
             onAdd={addInstitute}
+            onAddAdmin={addUser}
             onToggleStatus={toggleInstituteStatus}
             onImpersonate={handleImpersonate}
           />
@@ -955,7 +968,7 @@ export function ExamPlatform() {
             ops={adminOps}
             activeInstituteId={activeInstituteId}
             initialRoleFilter={initialRoleFilter}
-            readOnly={true}
+            readOnly={isImpersonating}
             onImpersonate={handleImpersonate}
           />
         )
@@ -1695,12 +1708,14 @@ function InstitutesManager({
   data,
   onSelect,
   onAdd,
+  onAddAdmin,
   onToggleStatus,
   onImpersonate,
 }: {
   data: AppData
   onSelect: (id: string, targetView?: View, targetRoleFilter?: 'all' | 'admin' | 'student') => void
   onAdd: (name: string, description?: string) => Promise<string | null>
+  onAddAdmin: (name: string, email: string, password: string, role: 'admin' | 'student', instituteId?: string) => Promise<string | null>
   onToggleStatus: (id: string, status: 'active' | 'inactive' | 'pending' | 'rejected', rejectionReason?: string) => Promise<string | null>
   onImpersonate: (user: User) => void
 }) {
@@ -1715,6 +1730,22 @@ function InstitutesManager({
   const [rejectModalInst, setRejectModalInst] = useState<Institute | null>(null)
   const [rejectReasonText, setRejectReasonText] = useState('')
   const [rejectingError, setRejectingError] = useState('')
+
+  // Add Admin modal state
+  const [addAdminInst, setAddAdminInst] = useState<Institute | null>(null)
+  const [adminName, setAdminName] = useState('')
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminError, setAdminError] = useState('')
+  const [adminSuccess, setAdminSuccess] = useState('')
+  const [addingAdmin, setAddingAdmin] = useState(false)
+  const [showAdminPassword, setShowAdminPassword] = useState(false)
+
+  const generateAdminPassword = () => {
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000)
+    setAdminPassword(`Admin@${randomSuffix}`)
+    setShowAdminPassword(true)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1940,14 +1971,29 @@ function InstitutesManager({
                 )}
               </div>
 
-              {/* Enter full workspace button */}
-              <div className="mt-6 border-t pt-4">
+              {/* Enter full workspace button & Add Admin */}
+              <div className="mt-6 border-t pt-4 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => onSelect(inst.id, 'dashboard')}
-                  className="btn w-full justify-center text-xs py-2.5"
+                  className="btn flex-1 justify-center text-xs py-2.5"
                 >
-                  Enter Institute Workspace &rarr;
+                  Enter Workspace &rarr;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddAdminInst(inst)
+                    setAdminName('')
+                    setAdminEmail('')
+                    setAdminPassword('')
+                    setAdminError('')
+                    setAdminSuccess('')
+                  }}
+                  className="btn secondary text-xs py-2.5 px-3 flex items-center gap-1.5 shrink-0"
+                  title={`Add Admin to ${inst.name}`}
+                >
+                  <UserPlus size={14} /> Add Admin
                 </button>
               </div>
             </article>
@@ -1956,6 +2002,151 @@ function InstitutesManager({
       </div>
       {!list.length && (
         <Empty text={search ? 'No institutes found matching search.' : 'No institutes created yet.'} />
+      )}
+
+      {/* Add Admin Modal */}
+      {addAdminInst && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <div className="grid size-8 place-items-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <UserPlus size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">Add Admin / Instructor</h3>
+                  <p className="text-xs text-muted-foreground">{addAdminInst.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddAdminInst(null)}
+                className="rounded-full p-1 text-muted-foreground hover:bg-accent"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!adminName.trim() || !adminEmail.trim() || !adminPassword.trim()) {
+                  setAdminError('All fields are required.')
+                  return
+                }
+                setAddingAdmin(true)
+                setAdminError('')
+                setAdminSuccess('')
+                try {
+                  const err = await onAddAdmin(
+                    adminName.trim(),
+                    adminEmail.trim().toLowerCase(),
+                    adminPassword.trim(),
+                    'admin',
+                    addAdminInst.id
+                  )
+                  if (err) {
+                    setAdminError(err)
+                  } else {
+                    setAdminSuccess(`Successfully onboarded ${adminName.trim()} as Admin for ${addAdminInst.name}!`)
+                    setTimeout(() => {
+                      setAddAdminInst(null)
+                    }, 1200)
+                  }
+                } catch {
+                  setAdminError('Failed to add admin. Please try again.')
+                } finally {
+                  setAddingAdmin(false)
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Full Name *</label>
+                <input
+                  type="text"
+                  value={adminName}
+                  onChange={(e) => setAdminName(e.target.value)}
+                  placeholder="e.g. Dr. Vikram Sharma"
+                  required
+                  className="w-full rounded-xl border bg-background px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Email Address *</label>
+                <input
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="e.g. vikram@prayas.test"
+                  required
+                  className="w-full rounded-xl border bg-background px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground">Initial Password *</label>
+                  <button
+                    type="button"
+                    onClick={generateAdminPassword}
+                    className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1"
+                  >
+                    <Sparkles size={11} /> Auto-Generate
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showAdminPassword ? 'text' : 'password'}
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="At least 4 characters"
+                    required
+                    minLength={4}
+                    className="w-full rounded-xl border bg-background px-3.5 py-2.5 text-sm pr-10 outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPassword(!showAdminPassword)}
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                  >
+                    {showAdminPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {adminError && (
+                <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-xl p-2.5">
+                  ⚠️ {adminError}
+                </p>
+              )}
+              {adminSuccess && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 font-semibold">
+                  ✓ {adminSuccess}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAddAdminInst(null)}
+                  className="btn secondary flex-1 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingAdmin}
+                  className="btn flex-1 text-xs font-semibold flex items-center justify-center gap-1.5"
+                >
+                  {addingAdmin ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                  Add Admin
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Rejection Reason Modal */}

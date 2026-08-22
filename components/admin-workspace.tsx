@@ -56,7 +56,13 @@ export type AdminOps = {
   addExam: (exam: Exam) => Promise<string | null>
   updateExam: (id: string, changes: Partial<Exam>) => Promise<string | null>
   deleteExam: (id: string) => Promise<string | null>
-  addUser: (name: string, email: string, password: string, role: 'admin' | 'student') => Promise<string | null>
+  addUser: (
+    name: string,
+    email: string,
+    password: string,
+    role: 'admin' | 'student',
+    instituteId?: string,
+  ) => Promise<string | null>
   updateUser: (
     id: string,
     name: string,
@@ -95,8 +101,8 @@ export function AdminWorkspace({
   const rooms = user.role === 'owner'
     ? (currentInstId ? data.rooms.filter((room) => room.instituteId === currentInstId) : data.rooms)
     : (currentInstId
-        ? data.rooms.filter((room) => room.instituteId === currentInstId || room.adminId === user.id)
-        : data.rooms.filter((room) => room.adminId === user.id))
+      ? data.rooms.filter((room) => room.instituteId === currentInstId || room.adminId === user.id)
+      : data.rooms.filter((room) => room.adminId === user.id))
 
   const exams = user.role === 'owner'
     ? (currentInstId ? data.exams.filter((exam) => exam.instituteId === currentInstId) : data.exams)
@@ -226,6 +232,10 @@ export function AdminWorkspace({
   }
 
   const handleResetAttempt = async (attempt: Attempt, studentName: string) => {
+    if (data.attempts.some((a) => a.userId === attempt.userId && !a.submittedAt)) {
+      alert("Student is currently taking test")
+      return;
+    }
     if (
       !window.confirm(
         `Are you sure you want to reset the test score for ${studentName}? This will delete their attempt and allow them to re-take the exam.`,
@@ -302,11 +312,11 @@ export function AdminWorkspace({
       : []
     const availableStudents = managingRoom
       ? data.users.filter(
-          (u) =>
-            u.role === 'student' &&
-            (currentInstId ? u.instituteId === currentInstId : true) &&
-            !managingRoom.memberIds?.includes(u.id),
-        )
+        (u) =>
+          u.role === 'student' &&
+          (currentInstId ? u.instituteId === currentInstId : true) &&
+          !managingRoom.memberIds?.includes(u.id),
+      )
       : []
 
     const filteredEnrolled = enrolledStudents.filter(
@@ -431,11 +441,10 @@ export function AdminWorkspace({
                 <button
                   type="button"
                   onClick={() => setRosterTab('enrolled')}
-                  className={`border-b-2 px-4 py-3 text-xs font-semibold transition ${
-                    rosterTab === 'enrolled'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`border-b-2 px-4 py-3 text-xs font-semibold transition ${rosterTab === 'enrolled'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   <Users size={14} className="inline mr-1.5" />
                   Enrolled Students ({enrolledStudents.length})
@@ -445,11 +454,10 @@ export function AdminWorkspace({
                     <button
                       type="button"
                       onClick={() => setRosterTab('enroll')}
-                      className={`border-b-2 px-4 py-3 text-xs font-semibold transition ${
-                        rosterTab === 'enroll'
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
+                      className={`border-b-2 px-4 py-3 text-xs font-semibold transition ${rosterTab === 'enroll'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
                     >
                       <UserPlus size={14} className="inline mr-1.5" />
                       Add Existing Students ({availableStudents.length})
@@ -457,11 +465,10 @@ export function AdminWorkspace({
                     <button
                       type="button"
                       onClick={() => setRosterTab('quick-add')}
-                      className={`border-b-2 px-4 py-3 text-xs font-semibold transition ${
-                        rosterTab === 'quick-add'
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
+                      className={`border-b-2 px-4 py-3 text-xs font-semibold transition ${rosterTab === 'quick-add'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
                     >
                       <Sparkles size={14} className="inline mr-1.5" />
                       Quick Onboard Student
@@ -471,11 +478,10 @@ export function AdminWorkspace({
                 <button
                   type="button"
                   onClick={() => setRosterTab('code')}
-                  className={`border-b-2 px-4 py-3 text-xs font-semibold transition ${
-                    rosterTab === 'code'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`border-b-2 px-4 py-3 text-xs font-semibold transition ${rosterTab === 'code'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
                 >
                   <School size={14} className="inline mr-1.5" />
                   Classroom Details & Code
@@ -1045,14 +1051,12 @@ export function AdminWorkspace({
                             {totalTimeSec > 0 && ` (${minutes}m ${seconds}s taken)`}
                           </p>
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                            <span className={`badge py-0.5 px-2 font-mono font-semibold ${
-                              (attempt.tabSwitchCount ?? 0) > 0 ? 'bg-destructive/15 text-destructive border-destructive/30 font-bold' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-                            }`}>
+                            <span className={`badge py-0.5 px-2 font-mono font-semibold ${(attempt.tabSwitchCount ?? 0) > 0 ? 'bg-destructive/15 text-destructive border-destructive/30 font-bold' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+                              }`}>
                               👁️ Tabs: {attempt.tabSwitchCount ?? 0}
                             </span>
-                            <span className={`badge py-0.5 px-2 font-mono font-semibold ${
-                              (attempt.fullscreenExitCount ?? 0) > 0 ? 'bg-destructive/15 text-destructive border-destructive/30 font-bold' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-                            }`}>
+                            <span className={`badge py-0.5 px-2 font-mono font-semibold ${(attempt.fullscreenExitCount ?? 0) > 0 ? 'bg-destructive/15 text-destructive border-destructive/30 font-bold' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+                              }`}>
                               🖥️ Exits: {attempt.fullscreenExitCount ?? 0}
                             </span>
                             {(attempt.cheatWarningCount ?? 0) > 0 && (
@@ -1258,41 +1262,37 @@ export function AdminWorkspace({
         <div className="mb-6 flex gap-2 rounded-xl border bg-card p-1">
           <button
             onClick={() => setExamTab('all')}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
-              examTab === 'all'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${examTab === 'all'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             All ({filteredExams.length})
           </button>
           <button
             onClick={() => setExamTab('live')}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
-              examTab === 'live'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${examTab === 'live'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Live ({liveExams.length})
           </button>
           <button
             onClick={() => setExamTab('draft')}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
-              examTab === 'draft'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${examTab === 'draft'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Drafts ({draftExams.length})
           </button>
           <button
             onClick={() => setExamTab('expired')}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
-              examTab === 'expired'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${examTab === 'expired'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Expired ({expiredExams.length})
           </button>
@@ -1360,14 +1360,12 @@ export function AdminWorkspace({
 
                     {/* Anti-cheating Telemetry Badges */}
                     <div className="flex flex-wrap items-center gap-2 pt-1 border-t text-[11px]">
-                      <span className={`badge py-0.5 px-2 font-mono font-semibold ${
-                        tabSwitches > 0 ? 'bg-destructive/15 text-destructive border-destructive/30 font-bold' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-                      }`}>
+                      <span className={`badge py-0.5 px-2 font-mono font-semibold ${tabSwitches > 0 ? 'bg-destructive/15 text-destructive border-destructive/30 font-bold' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+                        }`}>
                         👁️ Tabs: {tabSwitches}
                       </span>
-                      <span className={`badge py-0.5 px-2 font-mono font-semibold ${
-                        fsExits > 0 ? 'bg-destructive/15 text-destructive border-destructive/30 font-bold' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
-                      }`}>
+                      <span className={`badge py-0.5 px-2 font-mono font-semibold ${fsExits > 0 ? 'bg-destructive/15 text-destructive border-destructive/30 font-bold' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+                        }`}>
                         🖥️ Exits: {fsExits}
                       </span>
                       {warnings > 0 && (
@@ -1469,8 +1467,8 @@ export function AdminWorkspace({
                             activeTakers > 0
                               ? 'Cannot toggle publish status while students are taking the test'
                               : exam.questions.length
-                              ? undefined
-                              : 'Add a question before publishing'
+                                ? undefined
+                                : 'Add a question before publishing'
                           }
                           className="btn secondary disabled:opacity-40"
                         >
@@ -1847,15 +1845,14 @@ function Leaderboard({
           return (
             <div
               key={attempt.id}
-              className={`flex flex-wrap items-center justify-between gap-4 rounded-xl border p-3.5 transition-colors ${
-                rank === 1
-                  ? 'border-amber-500/40 bg-amber-500/10 shadow-sm dark:bg-amber-500/15'
-                  : rank === 2
-                    ? 'border-slate-300/80 bg-slate-500/5 dark:border-slate-700'
-                    : rank === 3
-                      ? 'border-amber-800/30 bg-amber-900/10 dark:border-amber-700/40'
-                      : 'bg-card'
-              }`}
+              className={`flex flex-wrap items-center justify-between gap-4 rounded-xl border p-3.5 transition-colors ${rank === 1
+                ? 'border-amber-500/40 bg-amber-500/10 shadow-sm dark:bg-amber-500/15'
+                : rank === 2
+                  ? 'border-slate-300/80 bg-slate-500/5 dark:border-slate-700'
+                  : rank === 3
+                    ? 'border-amber-800/30 bg-amber-900/10 dark:border-amber-700/40'
+                    : 'bg-card'
+                }`}
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 {rankBadge}
@@ -1877,20 +1874,18 @@ function Leaderboard({
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
                     <span
-                      className={`badge py-0.5 px-2 font-mono font-semibold ${
-                        (attempt.tabSwitchCount ?? 0) > 0
-                          ? 'border-destructive/30 bg-destructive/10 text-destructive font-bold'
-                          : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      }`}
+                      className={`badge py-0.5 px-2 font-mono font-semibold ${(attempt.tabSwitchCount ?? 0) > 0
+                        ? 'border-destructive/30 bg-destructive/10 text-destructive font-bold'
+                        : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        }`}
                     >
                       👁️ Tabs: {attempt.tabSwitchCount ?? 0}
                     </span>
                     <span
-                      className={`badge py-0.5 px-2 font-mono font-semibold ${
-                        (attempt.fullscreenExitCount ?? 0) > 0
-                          ? 'border-destructive/30 bg-destructive/10 text-destructive font-bold'
-                          : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      }`}
+                      className={`badge py-0.5 px-2 font-mono font-semibold ${(attempt.fullscreenExitCount ?? 0) > 0
+                        ? 'border-destructive/30 bg-destructive/10 text-destructive font-bold'
+                        : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        }`}
                     >
                       🖥️ Exits: {attempt.fullscreenExitCount ?? 0}
                     </span>
@@ -1950,6 +1945,7 @@ function PeopleView({
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [showAddUser, setShowAddUser] = useState(false)
   const [selectedRole, setSelectedRole] = useState<'student' | 'admin'>(forcedRole || 'student')
+  const [selectedInstId, setSelectedInstId] = useState<string>(activeInstitute?.id || (data.institutes?.[0]?.id ?? ''))
   const [formName, setFormName] = useState('')
   const [formEmail, setFormEmail] = useState('')
   const [formPassword, setFormPassword] = useState('')
@@ -1983,7 +1979,8 @@ function PeopleView({
     setNewError('')
     setSuccessMsg('')
     try {
-      const err = await ops.addUser(formName.trim(), formEmail.trim().toLowerCase(), formPassword, selectedRole)
+      const targetInst = (user.role === 'owner' && !activeInstitute?.id) ? selectedInstId : undefined
+      const err = await ops.addUser(formName.trim(), formEmail.trim().toLowerCase(), formPassword, selectedRole, targetInst)
       if (err) {
         setNewError(err)
       } else {
@@ -2243,7 +2240,7 @@ function PeopleView({
                 Create a student or instructor profile with immediate workspace credentials.
               </p>
             </div>
-            {activeInstitute && (
+            {activeInstitute ? (
               <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-2.5 text-xs flex items-center gap-2.5">
                 <span className="grid size-7 place-items-center rounded-lg bg-primary/20 text-primary">
                   <School size={15} />
@@ -2253,7 +2250,25 @@ function PeopleView({
                   <span className="font-bold text-foreground text-sm">{activeInstitute.name}</span>
                 </div>
               </div>
-            )}
+            ) : user.role === 'owner' && (data.institutes || []).length > 0 ? (
+              <div className="flex flex-col gap-1 min-w-[220px]">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1">
+                  <School size={12} className="text-primary" /> Target Institute <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={selectedInstId}
+                  onChange={(e) => setSelectedInstId(e.target.value)}
+                  className="rounded-xl border bg-background px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="" disabled>Select an Institute</option>
+                  {(data.institutes || []).map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.name} ({inst.status || 'active'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
 
           <form onSubmit={handleAddUser} className="mt-6 space-y-6">
@@ -2266,11 +2281,10 @@ function PeopleView({
                 {/* Student Option */}
                 <div
                   onClick={() => setSelectedRole('student')}
-                  className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${
-                    selectedRole === 'student'
-                      ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-500/5 shadow-sm'
-                      : 'border-border bg-card hover:border-purple-500/40 hover:bg-muted/40'
-                  }`}
+                  className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${selectedRole === 'student'
+                    ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-500/5 shadow-sm'
+                    : 'border-border bg-card hover:border-purple-500/40 hover:bg-muted/40'
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="grid size-10 place-items-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
@@ -2291,11 +2305,10 @@ function PeopleView({
                 {/* Admin Option */}
                 <div
                   onClick={() => setSelectedRole('admin')}
-                  className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${
-                    selectedRole === 'admin'
-                      ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-500/5 shadow-sm'
-                      : 'border-border bg-card hover:border-blue-500/40 hover:bg-muted/40'
-                  }`}
+                  className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${selectedRole === 'admin'
+                    ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-500/5 shadow-sm'
+                    : 'border-border bg-card hover:border-blue-500/40 hover:bg-muted/40'
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="grid size-10 place-items-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -2472,9 +2485,8 @@ function PeopleView({
           return (
             <article
               key={person.id}
-              className={`rounded-2xl border p-6 transition-all hover:shadow-sm ${
-                isUserActive ? 'bg-card' : 'bg-muted/20 border-destructive/20 opacity-90'
-              }`}
+              className={`rounded-2xl border p-6 transition-all hover:shadow-sm ${isUserActive ? 'bg-card' : 'bg-muted/20 border-destructive/20 opacity-90'
+                }`}
             >
               {isEditing ? (
                 <form
@@ -2546,28 +2558,25 @@ function PeopleView({
                     }}
                   >
                     <div className="flex items-center gap-3.5">
-                      <div className={`grid size-11 place-items-center rounded-2xl font-bold text-sm shadow-xs ${
-                        person.role === 'admin'
-                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                          : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
-                      }`}>
+                      <div className={`grid size-11 place-items-center rounded-2xl font-bold text-sm shadow-xs ${person.role === 'admin'
+                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                        : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                        }`}>
                         {person.role === 'admin' ? <ShieldCheck size={20} /> : <GraduationCap size={20} />}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-base font-bold text-foreground">{person.name}</p>
-                          <span className={`badge text-xs px-2.5 py-0.5 font-semibold ${
-                            person.role === 'admin' 
-                              ? 'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400' 
-                              : 'border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400'
-                          }`}>
+                          <span className={`badge text-xs px-2.5 py-0.5 font-semibold ${person.role === 'admin'
+                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                            : 'border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                            }`}>
                             {person.role === 'admin' ? 'Admin / Instructor' : 'Student'}
                           </span>
-                          <span className={`badge text-xs px-2 py-0.5 font-bold ${
-                            isUserActive
-                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : 'border-destructive/30 bg-destructive/10 text-destructive'
-                          }`}>
+                          <span className={`badge text-xs px-2 py-0.5 font-bold ${isUserActive
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            : 'border-destructive/30 bg-destructive/10 text-destructive'
+                            }`}>
                             {isUserActive ? 'Active' : 'Deactivated'}
                           </span>
                         </div>
@@ -2580,13 +2589,13 @@ function PeopleView({
                           {person.roomIds?.length || 0} room{person.roomIds?.length === 1 ? '' : 's'} joined
                         </span>
                       )}
-                      
+
                       {(() => {
                         const isTakingTest = data.attempts.some((a) => a.userId === person.id && !a.submittedAt)
                         if (isTakingTest) {
                           return (
                             <span className="badge border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-xs py-1 px-2.5 flex items-center gap-1">
-                              <Lock size={12} /> Taking Test (Impersonation Locked)
+                              <Lock size={12} /> Taking Test
                             </span>
                           )
                         }
@@ -2618,11 +2627,10 @@ function PeopleView({
                               const newStatus = isUserActive ? 'inactive' : 'active'
                               await ops.toggleUserStatus(person.id, newStatus)
                             }}
-                            className={`flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition ${
-                              isUserActive
-                                ? 'border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20'
-                                : 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
-                            }`}
+                            className={`flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition ${isUserActive
+                              ? 'border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20'
+                              : 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                              }`}
                           >
                             <Power size={13} />
                             {isUserActive ? 'Deactivate' : 'Activate'}
