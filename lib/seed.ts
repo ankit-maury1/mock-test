@@ -31,7 +31,7 @@ export async function seedIfEmpty(): Promise<void> {
     name: 'Prayas Owner',
     email: 'owner@prayas.test',
     passwordHash: ownerHash,
-    role: 'owner',
+    role: 'owner' as const,
     roomIds: [] as string[],
     instituteId: undefined as string | undefined,
   }
